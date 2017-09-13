@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-# Si jamais, pour écrire des nombre sur le port série, il faut utiliser :
-# ser.write([3]) ! La liste [3] est considérée comme un 11 binaire...
 import os
 import sys
 import time
@@ -10,17 +8,14 @@ import random
 
 import serial
 import csv
-from multiprocessing import Process, Pipe
 from datetime import datetime
 
-import numpy as np
-import matplotlib.pyplot as plt
 import pyqtgraph as pg
 
 import icons_rc
-from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QTextEdit, QSpacerItem, QSizePolicy, QMainWindow, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QVBoxLayout, QLabel, QSpacerItem
+from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QLabel, QInputDialog
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QThread, QTimer
+from PyQt5.QtCore import Qt, QTimer
 
 class ExploreGraphWindow(QDialog):
 
@@ -41,7 +36,22 @@ class ExploreGraphWindow(QDialog):
         self.pw.setLabel('bottom', 'Time', 's')
         self.pw_zoom.setLabel('bottom', 'Time', 's')
 
-        # Label with data
+        # TODO : display time mark with bar
+        
+        # Time Mark !
+        self.time_marks = dict() # {'numero de sample':'label', }
+        # On récupère les labels, et affiche les barres
+        for i, label in enumerate(self.samples['l']):
+            if label != '':
+                self.time_marks[i] = label
+                tm_line = pg.InfiniteLine(angle=90, movable=False, pen='666')
+                tm_line2 = pg.InfiniteLine(angle=90, movable=False, pen='666')
+                self.pw.addItem(tm_line)
+                self.pw_zoom.addItem(tm_line2)
+                tm_line.setPos(self.samples['s'][i])
+                tm_line2.setPos(self.samples['s'][i])
+
+        # Labels with data
         w_label = QWidget()
         w_label.setLayout(QHBoxLayout())
         w_label.layout().addStretch()
@@ -51,7 +61,10 @@ class ExploreGraphWindow(QDialog):
             self.DataLabel[k].setStyleSheet('color:grey')
             self.DataLabel[k].setText('Infos')
             w_label.layout().addWidget(self.DataLabel[k])
-
+        # Time Marks display
+        self.timeMarkLabel = QLabel()
+        self.timeMarkLabel.setStyleSheet('font-size:16px; color:grey')
+        w_label.layout().addWidget(self.timeMarkLabel)
 
         # Buttons
         self.ShowXDataBox = QCheckBox('X Data')
@@ -91,7 +104,7 @@ class ExploreGraphWindow(QDialog):
         self.region = pg.LinearRegionItem()
         self.region.setZValue(50) # Pour que ce soit devant j'imagine
         self.region.sigRegionChanged.connect(self.update_zoom)
-        self.region.setRegion([600, 1000])
+        self.region.setRegion([1, 6])
 
         self.pw.addItem(self.region, ignoreBounds=True)
         #self.pw_zoom.setAutoVisible(y=True)
@@ -118,28 +131,40 @@ class ExploreGraphWindow(QDialog):
             Met à jour la position de la croix
         """
 
+        # Map mouse position to graph and move cross
         mousePoint = self.vb.mapSceneToView(pos)
         self.vline.setPos(mousePoint.x())
         self.hline.setPos(mousePoint.y())
-        index = int(mousePoint.x())
-        # TODO : coloriser ces infos et rendre leur affichage conditionnel
-        # Display details for checked data
+
+        # Select closest sample to actual position
+        index = float(mousePoint.x())
+        for no_sample, s in enumerate(self.samples['s']):
+            if s > index:
+                break
+
+        # display relevant value label
         data_label = ''
         for k, color in [('x','red'), ('y','green'), ('z','blue'), ('t', 'yellow')]:
             self.DataLabel[k].hide()
             if self.display_details[k]:
-                data_label = f"{k} = {self.samples[k][index]}  "
+                data_label = f"{k} = {self.samples[k][no_sample]}  "
                 self.DataLabel[k].setText(data_label)
                 self.DataLabel[k].setStyleSheet(f"color:{color}; font-size:16px")
                 self.DataLabel[k].show()
 
+        # display time mark value
+        no_sample_with_mark = None
+        for sample_target in self.time_marks.keys():
+            if abs(sample_target - no_sample) < 50 :
+                no_sample_with_mark = sample_target
+                break
+        if no_sample_with_mark is not None:
+            self.timeMarkLabel.setText(self.time_marks[no_sample_with_mark])
+            self.timeMarkLabel.show()
+        else:
+            self.timeMarkLabel.hide()
+        #self.timeMarkLabel.show()
 
-        #if self.pw.sceneBoundingRect().contains(pos):
-        #    print(self.pw.sceneBoundingRect())
-            #index = int(mousePoint.x())
-            #if index > 0 and index < len(self.samples['s']):
-            #    self.vline.setPos(mousePoint.x())
-            #    self.hline.setPos(mousePoint.y())
 
     def update_zoom(self):
         """
@@ -165,8 +190,8 @@ class ExploreGraphWindow(QDialog):
             Obvious
         """
         if self.ShowXDataBox.isChecked():
-            self.x_z_graphItem = self.pw_zoom.plot(self.samples['x'], pen = 'r')
-            self.x_graphItem = self.pw.plot(self.samples['x'], pen = 'r')
+            self.x_z_graphItem = self.pw_zoom.plot(self.samples['s'], self.samples['x'], pen = 'r')
+            self.x_graphItem = self.pw.plot(self.samples['s'], self.samples['x'], pen = 'r')
             self.display_details['x'] = True
         else:
             self.pw_zoom.removeItem(self.x_z_graphItem)
@@ -178,8 +203,8 @@ class ExploreGraphWindow(QDialog):
             Obvious
         """
         if self.ShowYDataBox.isChecked():
-            self.z_y_graphItem = self.pw_zoom.plot(self.samples['y'], pen = 'g')
-            self.y_graphItem = self.pw.plot(self.samples['y'], pen = 'g')
+            self.z_y_graphItem = self.pw_zoom.plot(self.samples['s'], self.samples['y'], pen = 'g')
+            self.y_graphItem = self.pw.plot(self.samples['s'], self.samples['y'], pen = 'g')
             self.display_details['y'] = True
         else:
             self.pw_zoom.removeItem(self.z_y_graphItem)
@@ -191,8 +216,8 @@ class ExploreGraphWindow(QDialog):
             Obvious
         """
         if self.ShowZDataBox.isChecked():
-            self.z_z_graphItem = self.pw_zoom.plot(self.samples['z'], pen = 'b')
-            self.z_graphItem = self.pw.plot(self.samples['z'], pen = 'b')
+            self.z_z_graphItem = self.pw_zoom.plot(self.samples['s'], self.samples['z'], pen = 'b')
+            self.z_graphItem = self.pw.plot(self.samples['s'], self.samples['z'], pen = 'b')
             self.display_details['z'] = True
         else:
             self.pw_zoom.removeItem(self.z_z_graphItem)
@@ -204,8 +229,8 @@ class ExploreGraphWindow(QDialog):
             Obvious
         """
         if self.ShowTDataBox.isChecked():
-            self.z_t_graphItem = self.pw_zoom.plot(self.samples['t'], pen = 'y')
-            self.t_graphItem = self.pw.plot(self.samples['t'], pen = 'y')
+            self.z_t_graphItem = self.pw_zoom.plot(self.samples['s'], self.samples['t'], pen = 'y')
+            self.t_graphItem = self.pw.plot(self.samples['s'], self.samples['t'], pen = 'y')
             self.display_details['t'] = True
         else:
             self.pw_zoom.removeItem(self.z_t_graphItem)
@@ -250,8 +275,7 @@ class LiveGraphWindow(QDialog):
 
         # Variables de stockage des données
         self.millis_ref_start = 0 # allow to begin at 0
-        self.samples_data = [] # [[s, x, y, z, t], ]
-        self.samples_metadata = [] # [[s, label], ]
+        self.samples_data = [] # [[s, x, y, z, t, l], ]
 
         # Store date to label csv file
         self.aquisition_date = str(datetime.now())
@@ -299,7 +323,8 @@ class LiveGraphWindow(QDialog):
                                     x_mesure_burst[i], 
                                     y_mesure_burst[i],
                                     z_mesure_burst[i],
-                                    t_mesure_burst[i] ])
+                                    t_mesure_burst[i],
+                                    ''])
         self.samples_data.extend(raw_data_burst)
 
         # Plot Data
@@ -308,20 +333,31 @@ class LiveGraphWindow(QDialog):
         self.pw.plot(s_mesure_burst, z_mesure_burst, pen='b')
         self.pw.plot(s_mesure_burst, t_mesure_burst, pen='y')
 
+    def closeEvent(self, evt):
+        # Stop aquiring data
+        self.timer.stop()
+
+
     def set_time_mark(self):
         """
             Record time of the click display bar and store that info
         """
-        #print(self.samples_data)
-        #print(len(self.samples_data))
+        # Get last sample
+        last_sample = self.samples_data[-1]
+
+        # Open Dialog
+        mark_txt, ok = QInputDialog.getText(self, 'Time Mark', 'Enter name for Time Mark')
+
+        if ok:
+            if mark_txt != '':
+                last_sample[-1] = mark_txt
+            else:
+                last_sample[-1] = 'Time Mark'
 
     def close_and_save(self):
         """
             Close mesure windows, and save data to csv
         """
-        # Stop aquiring data
-        self.timer.stop()
-
         # Create csv file
         csvfolder = 'aquisitions'
         if not os.path.exists(csvfolder):
@@ -332,7 +368,7 @@ class LiveGraphWindow(QDialog):
 
             c = csv.writer(csvfile)
 
-            c.writerow(['Time [s]', 'X accel', 'Y accel', 'Z accel', 'Temp'])
+            c.writerow(['Time [s]', 'X accel', 'Y accel', 'Z accel', 'Temp', 'Label'])
             for sample in self.samples_data:
                 c.writerow(sample)
 
@@ -490,12 +526,14 @@ class MainWindow(QWidget):
                 samples['y'] = []
                 samples['z'] = []
                 samples['t'] = []
+                samples['l'] = []
                 for row in reader:
                     samples['s'].append(float(row['Time [s]']))
                     samples['x'].append(int(row['X accel']))
                     samples['y'].append(int(row['Y accel']))
                     samples['z'].append(int(row['Z accel']))
                     samples['t'].append(int(row['Temp']))
+                    samples['l'].append(row['Label'])
         
         ExploreGraphWin = ExploreGraphWindow(samples, self)
         
