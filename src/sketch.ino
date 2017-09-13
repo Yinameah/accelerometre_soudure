@@ -23,18 +23,11 @@ SCLK, MISO, MOSI, and DP 10 of Arduino
 #define LED_G 7
 #define LED_R 6
 
-#define nbr_sample 200
-
 #include <SPI.h>
 #include <ADXL362.h>
 
 ADXL362 xl;
 int16_t xdata, ydata, zdata, tdata;
-int16_t zdata_buffer;
-int16_t bunch_z[nbr_sample];
-unsigned long bunch_milli[nbr_sample];
-int i_bunch = 0;
-
 
 int incomingByte;
 bool transmission_has_end = true;
