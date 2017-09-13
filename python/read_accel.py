@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# Si jamais, pour écrire des nombre sur le port série, il faut utiliser :
+# ser.write([3]) ! La liste [3] est considérée comme un 11 binaire...
 import os
 import sys
 import time
@@ -10,12 +12,12 @@ import serial
 import csv
 from datetime import datetime
 
-import pyqtgraph as pg
-
-import icons_rc
-from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QLabel, QInputDialog
+from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QTextEdit, QSpacerItem, QSizePolicy, QMainWindow, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QVBoxLayout, QLabel, QSpacerItem
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QThread, QTimer
+import icons_rc
+
+import pyqtgraph as pg
 
 class ExploreGraphWindow(QDialog):
 
@@ -419,11 +421,6 @@ class MainWindow(QWidget):
         self.ser.baudrate = 115200;
         self.refresh_serial()
 
-        # Init des variables de stockage de mesure
-        #self.current_mesures = []
-        # Pipe pour process serial
-        self.pipe_main, self.pipe_serial = Pipe()
-
         self.show()
 
         # AUTO CONNECT FOR TESTS
@@ -535,7 +532,7 @@ class MainWindow(QWidget):
                     samples['t'].append(int(row['Temp']))
                     samples['l'].append(row['Label'])
         
-        ExploreGraphWin = ExploreGraphWindow(samples, self)
+            ExploreGraphWin = ExploreGraphWindow(samples, self)
         
             
 
