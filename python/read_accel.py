@@ -28,12 +28,13 @@ class ExploreGraphWindow(QDialog):
         super().__init__(parent)
 
         self.samples = samples
+        self.display_details = dict(x = False, y = False, z = False, t = False)
 
         self.setWindowTitle('Mesure')
         self.setStyleSheet('background:black')
         self.setModal(True)
+        self.setWindowFlags(Qt.Window)
 
-        # TODO : add label with infos
         # Plot Widget  ## giving the plots names allows us to link their axes together
         self.pw = pg.PlotWidget(name='Plot')
         self.pw_zoom = pg.PlotWidget(name='Plot_Zoom')
@@ -41,13 +42,15 @@ class ExploreGraphWindow(QDialog):
         self.pw_zoom.setLabel('bottom', 'Time', 's')
 
         # Label with data
-        self.DataLabel = QLabel()
-        self.DataLabel.setStyleSheet('color:grey')
-        self.DataLabel.setText('Infos')
         w_label = QWidget()
         w_label.setLayout(QHBoxLayout())
         w_label.layout().addStretch()
-        w_label.layout().addWidget(self.DataLabel)
+        self.DataLabel = dict()
+        for k in ['x', 'y', 'z', 't']:
+            self.DataLabel[k] = QLabel()
+            self.DataLabel[k].setStyleSheet('color:grey')
+            self.DataLabel[k].setText('Infos')
+            w_label.layout().addWidget(self.DataLabel[k])
 
 
         # Buttons
@@ -119,7 +122,17 @@ class ExploreGraphWindow(QDialog):
         self.vline.setPos(mousePoint.x())
         self.hline.setPos(mousePoint.y())
         index = int(mousePoint.x())
-        self.DataLabel.setText(str(self.samples['x'][index]))
+        # TODO : coloriser ces infos et rendre leur affichage conditionnel
+        # Display details for checked data
+        data_label = ''
+        for k, color in [('x','red'), ('y','green'), ('z','blue'), ('t', 'yellow')]:
+            self.DataLabel[k].hide()
+            if self.display_details[k]:
+                data_label = f"{k} = {self.samples[k][index]}  "
+                self.DataLabel[k].setText(data_label)
+                self.DataLabel[k].setStyleSheet(f"color:{color}; font-size:16px")
+                self.DataLabel[k].show()
+
 
         #if self.pw.sceneBoundingRect().contains(pos):
         #    print(self.pw.sceneBoundingRect())
@@ -154,9 +167,11 @@ class ExploreGraphWindow(QDialog):
         if self.ShowXDataBox.isChecked():
             self.x_z_graphItem = self.pw_zoom.plot(self.samples['x'], pen = 'r')
             self.x_graphItem = self.pw.plot(self.samples['x'], pen = 'r')
+            self.display_details['x'] = True
         else:
             self.pw_zoom.removeItem(self.x_z_graphItem)
             self.pw.removeItem(self.x_graphItem)
+            self.display_details['x'] = False
 
     def show_y_data(self):
         """
@@ -165,9 +180,11 @@ class ExploreGraphWindow(QDialog):
         if self.ShowYDataBox.isChecked():
             self.z_y_graphItem = self.pw_zoom.plot(self.samples['y'], pen = 'g')
             self.y_graphItem = self.pw.plot(self.samples['y'], pen = 'g')
+            self.display_details['y'] = True
         else:
             self.pw_zoom.removeItem(self.z_y_graphItem)
             self.pw.removeItem(self.y_graphItem)
+            self.display_details['y'] = False
 
     def show_z_data(self):
         """
@@ -176,9 +193,11 @@ class ExploreGraphWindow(QDialog):
         if self.ShowZDataBox.isChecked():
             self.z_z_graphItem = self.pw_zoom.plot(self.samples['z'], pen = 'b')
             self.z_graphItem = self.pw.plot(self.samples['z'], pen = 'b')
+            self.display_details['z'] = True
         else:
             self.pw_zoom.removeItem(self.z_z_graphItem)
             self.pw.removeItem(self.z_graphItem)
+            self.display_details['z'] = False
 
     def show_t_data(self):
         """
@@ -187,9 +206,11 @@ class ExploreGraphWindow(QDialog):
         if self.ShowTDataBox.isChecked():
             self.z_t_graphItem = self.pw_zoom.plot(self.samples['t'], pen = 'y')
             self.t_graphItem = self.pw.plot(self.samples['t'], pen = 'y')
+            self.display_details['t'] = True
         else:
             self.pw_zoom.removeItem(self.z_t_graphItem)
             self.pw.removeItem(self.t_graphItem)
+            self.display_details['t'] = False
 
 
 class LiveGraphWindow(QDialog):
@@ -319,7 +340,6 @@ class LiveGraphWindow(QDialog):
         pass
 
 
-
 class MainWindow(QWidget):
 
     def __init__(self, parent=None):
@@ -373,7 +393,7 @@ class MainWindow(QWidget):
         # AUTO CONNECT FOR TESTS
         #self.open_serial()
         #self.begin_mesure()
-        self.open_mesure()
+        #self.open_mesure()
 
 
     def refresh_serial(self):
@@ -451,14 +471,14 @@ class MainWindow(QWidget):
             Open a mesure already recorded
         """
         # Return tuple('filename','type')
-        #filename = QFileDialog.getOpenFileName(
-        #                    self,
-        #                    "Open CSV", 
-        #                    "aquisitions/", 
-        #                    "CSV Files (*.csv)")
+        filename = QFileDialog.getOpenFileName(
+                            self,
+                            "Open CSV", 
+                            "aquisitions/", 
+                            "CSV Files (*.csv)")
 
-        filename = []
-        filename.append('/home/aurelien/sketchbook/arduino/accelerometre_pour_soudure/aquisitions/test.csv')
+        #filename = []
+        #filename.append('/home/aurelien/sketchbook/arduino/accelerometre_pour_soudure/aquisitions/test.csv')
         # Read CSV file, store_data
         if filename[0] != '':
             with open(filename[0], 'r') as csvfile:
