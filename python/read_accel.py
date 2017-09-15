@@ -12,19 +12,57 @@ import serial
 import csv
 from datetime import datetime
 
-from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QTextEdit, QSpacerItem, QSizePolicy, QMainWindow, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QVBoxLayout, QLabel, QSpacerItem
+from PyQt5.QtWidgets import QApplication, QDialog, QGridLayout, QPushButton, QTextEdit, QSpacerItem, QSizePolicy, QMainWindow, QWidget, QComboBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFileDialog, QVBoxLayout, QLabel, QSpacerItem, QInputDialog
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QThread, QTimer
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 import icons_rc
 
 import pyqtgraph as pg
 
+class EditableInfiniteLine(pg.InfiniteLine):
+
+    labelChanged = pyqtSignal(str, int)
+    
+    def __init__(self, pos=None, angle=90, pen=None, movable=False, bounds=None,
+                hoverPen=None, label=None, labelOpts=None, name=None):
+        super().__init__(pos, angle, pen, movable, bounds, hoverPen, label, labelOpts, name)
+
+        # Store relevant time mark sample_number
+        self.tm_sample_nbr = 0
+
+    def mouseDoubleClickEvent(self, evt):
+        mark_txt, ok = QInputDialog.getText(self.parent(), 'Time Mark',
+                                            'Enter new name for this Time Mark')
+
+        if ok :
+            self.labelChanged.emit(mark_txt, self.tm_sample_nbr)
+
+
 class ExploreGraphWindow(QDialog):
 
-    def __init__(self, samples, parent=None):
+    def __init__(self, filename, parent=None):
         super().__init__(parent)
 
-        self.samples = samples
+        self.filename = filename
+        # Read CSV file, store_data
+        with open(filename, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+
+            self.samples = dict()
+            self.samples['s'] = []
+            self.samples['x'] = []
+            self.samples['y'] = []
+            self.samples['z'] = []
+            self.samples['t'] = []
+            self.samples['l'] = []
+            for row in reader:
+                self.samples['s'].append(float(row['Time [s]']))
+                self.samples['x'].append(int(row['X accel']))
+                self.samples['y'].append(int(row['Y accel']))
+                self.samples['z'].append(int(row['Z accel']))
+                self.samples['t'].append(int(row['Temp']))
+                self.samples['l'].append(row['Label'])
+    
         self.display_details = dict(x = False, y = False, z = False, t = False)
 
         self.setWindowTitle('Mesure')
@@ -35,19 +73,21 @@ class ExploreGraphWindow(QDialog):
         # Plot Widget  ## giving the plots names allows us to link their axes together
         self.pw = pg.PlotWidget(name='Plot')
         self.pw_zoom = pg.PlotWidget(name='Plot_Zoom')
+
         self.pw.setLabel('bottom', 'Time', 's')
         self.pw_zoom.setLabel('bottom', 'Time', 's')
 
-        # TODO : display time mark with bar
-        
         # Time Mark !
         self.time_marks = dict() # {'numero de sample':'label', }
         # On récupère les labels, et affiche les barres
         for i, label in enumerate(self.samples['l']):
             if label != '':
                 self.time_marks[i] = label
-                tm_line = pg.InfiniteLine(angle=90, movable=False, pen='666')
-                tm_line2 = pg.InfiniteLine(angle=90, movable=False, pen='666')
+                tm_line = pg.InfiniteLine(angle=90, movable=False, pen='aaa')
+                # Use custom line that can be edited
+                tm_line2 = EditableInfiniteLine(angle=90, movable=False, pen='aaa')
+                tm_line2.labelChanged.connect(self.update_label)
+                tm_line2.tm_sample_nbr = i
                 self.pw.addItem(tm_line)
                 self.pw_zoom.addItem(tm_line2)
                 tm_line.setPos(self.samples['s'][i])
@@ -127,6 +167,32 @@ class ExploreGraphWindow(QDialog):
 
         self.show()
 
+    def update_label(self, txt, sample_no):
+        """
+            React to custom InfiniteLine Signal
+            Update label, store in csv ...
+        """
+        # rename in local variable
+        self.samples['l'][sample_no] = txt
+        self.time_marks[sample_no] = txt
+
+        # Open file and rewrite all
+        with open(self.filename, 'w', encoding="utf8") as csvfile:
+
+            c = csv.writer(csvfile)
+
+            c.writerow(['Time [s]', 'X accel', 'Y accel', 'Z accel', 'Temp', 'Label'])
+            #for sample in self.samples:
+            for i in range(len(self.samples['s'])):
+                #print(type(self.samples['s'][i]))
+                row = [ self.samples['s'][i],
+                        self.samples['x'][i],
+                        self.samples['y'][i],
+                        self.samples['z'][i],
+                        self.samples['t'][i],
+                        self.samples['l'][i] ]
+                c.writerow(row)
+
     def mouseMoved(self, pos):
         """
             Appellé au déplacement de la souris sur le plot zoomé
@@ -165,8 +231,6 @@ class ExploreGraphWindow(QDialog):
             self.timeMarkLabel.show()
         else:
             self.timeMarkLabel.hide()
-        #self.timeMarkLabel.show()
-
 
     def update_zoom(self):
         """
@@ -338,7 +402,6 @@ class LiveGraphWindow(QDialog):
     def closeEvent(self, evt):
         # Stop aquiring data
         self.timer.stop()
-
 
     def set_time_mark(self):
         """
@@ -512,27 +575,8 @@ class MainWindow(QWidget):
 
         #filename = []
         #filename.append('/home/aurelien/sketchbook/arduino/accelerometre_pour_soudure/aquisitions/test.csv')
-        # Read CSV file, store_data
         if filename[0] != '':
-            with open(filename[0], 'r') as csvfile:
-                reader = csv.DictReader(csvfile)
-
-                samples = dict()
-                samples['s'] = []
-                samples['x'] = []
-                samples['y'] = []
-                samples['z'] = []
-                samples['t'] = []
-                samples['l'] = []
-                for row in reader:
-                    samples['s'].append(float(row['Time [s]']))
-                    samples['x'].append(int(row['X accel']))
-                    samples['y'].append(int(row['Y accel']))
-                    samples['z'].append(int(row['Z accel']))
-                    samples['t'].append(int(row['Temp']))
-                    samples['l'].append(row['Label'])
-        
-            ExploreGraphWin = ExploreGraphWindow(samples, self)
+            ExploreGraphWin = ExploreGraphWindow(filename[0], self)
         
             
 
