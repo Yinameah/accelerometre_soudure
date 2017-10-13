@@ -56,7 +56,11 @@ void setup(){
   xl.SPIwriteOneRegister(0x2D, 0x32);
 
   // Filter Register Control (8g mode)
-  xl.SPIwriteOneRegister(0x2C, 0xD7);
+  xl.SPIwriteOneRegister(0x2C, 0x87);
+  // Filter Register Control (4g mode)
+  //xl.SPIwriteOneRegister(0x2C, 0x47);
+  // Filter Register Control (2g mode)
+  //xl.SPIwriteOneRegister(0x2C, 0x07);
 
   // laisse initialiser, mec !
   delay(100);
@@ -80,30 +84,31 @@ void loop(){
     Serial.println(tdata);	 
 
     // 400 Hz (res acceleromètre) => 2500 - 44 - 760 = 1696
-    delayMicroseconds(1700);
+    //delayMicroseconds(1700);
+    delayMicroseconds(200);
 
 
-  if(Serial.available() > 1){
-    incomingByte = Serial.read();
+  //if(Serial.available() > 1){
+  //  incomingByte = Serial.read();
 
-    if (incomingByte == 97){
-      led_r_on = !led_r_on;
+  //  if (incomingByte == 97){
+  //    led_r_on = !led_r_on;
 
-        read_reg_value = xl.SPIreadOneRegister(0x2D);
+  //      read_reg_value = xl.SPIreadOneRegister(0x2D);
 
-        Serial.print("Value of reg 0x2D (HEX): ");
-        Serial.println(read_reg_value, HEX);
+  //      Serial.print("Value of reg 0x2D (HEX): ");
+  //      Serial.println(read_reg_value, HEX);
 
-    }
-    else if (incomingByte == 98){
-      led_g_on = !led_g_on;
+  //  }
+  //  else if (incomingByte == 98){
+  //    led_g_on = !led_g_on;
 
-        read_reg_value = xl.SPIreadOneRegister(0x2D);
+  //      read_reg_value = xl.SPIreadOneRegister(0x2D);
 
-        Serial.print("Value of reg 0x2D (HEX): ");
-        Serial.println(read_reg_value, HEX);
-    }
-  }
+  //      Serial.print("Value of reg 0x2D (HEX): ");
+  //      Serial.println(read_reg_value, HEX);
+  //  }
+  //}
     
     //update_led();  
 }
