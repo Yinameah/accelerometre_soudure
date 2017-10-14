@@ -322,7 +322,7 @@ class LiveGraphWindow(QDialog):
         self.MarkTimeButton = QPushButton('Set time mark')
         self.MarkTimeButton.clicked.connect(self.set_time_mark)
         self.CloseAndSaveButton = QPushButton('Close and Save')
-        self.CloseAndSaveButton.clicked.connect(self.close_and_save)
+        self.CloseAndSaveButton.clicked.connect(self.save_data)
 
         # Layout
         self.setLayout(QGridLayout())
@@ -346,10 +346,16 @@ class LiveGraphWindow(QDialog):
         # Store date to label csv file
         self.aquisition_date = str(datetime.now())
 
-        # Launch timer
+        # Launch timer for aquisition
+        self.timercount = 0
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_graph)
         self.timer.start(50)
+
+        # Launch timer for auto-save
+        #self.timer_save = QTimer()
+        #self.timer.timeout.connect(self.auto_save)
+        #self.timer.start(3000)
 
     def update_graph(self):
         """
@@ -399,6 +405,11 @@ class LiveGraphWindow(QDialog):
         self.pw.plot(s_mesure_burst, z_mesure_burst, pen='b')
         self.pw.plot(s_mesure_burst, t_mesure_burst, pen='y')
 
+        self.timercount += 1
+        if self.timercount > 30 :
+            self.timercount = 0
+            self.save_data(True)
+
     def closeEvent(self, evt):
         # Stop aquiring data
         self.timer.stop()
@@ -419,9 +430,9 @@ class LiveGraphWindow(QDialog):
             else:
                 last_sample[-1] = 'Time Mark'
 
-    def close_and_save(self):
+    def save_data(self, auto_save):
         """
-            Close mesure windows, and save data to csv
+            When closing mesure windows, save data to csv
         """
         # Create csv file
         csvfolder = 'aquisitions'
@@ -437,8 +448,11 @@ class LiveGraphWindow(QDialog):
             for sample in self.samples_data:
                 c.writerow(sample)
 
+        if not auto_save:
+            self.close_win()
+
+    def close_win(self):
         self.close()
-        pass
 
 
 class MainWindow(QWidget):
